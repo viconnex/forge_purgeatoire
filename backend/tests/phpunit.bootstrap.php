@@ -1,37 +1,24 @@
-<!--https://github.com/dmaicher/doctrine-test-bundle/blob/master/tests/phpunit.bootstrap.php-->
 <?php
 
-use App\Kernel;
+use Symfony\Component\Dotenv\Dotenv;
+use Symfony\Bundle\FrameworkBundle\Console\Application;
 
-require_once __DIR__.'/../vendor/autoload.php';
+require dirname(__DIR__).'/vendor/autoload.php';
 
-$kernel = new Kernel('test', true);
-$kernel->boot();
+// Load cached env vars if the .env.local.php file exists
+// Run "composer dump-env prod" to create it (requires symfony/flex >=1.2)
+if (is_array($env = @include dirname(__DIR__).'/.env.local.php')) {
+    $_SERVER += $env;
+    $_ENV += $env;
+} elseif (!class_exists(Dotenv::class)) {
+    throw new RuntimeException('Please run "composer require symfony/dotenv" to load the ".env" files configuring the application.');
+} else {
+    // load all the .env files
+    (new Dotenv())->loadEnv(dirname(__DIR__).'/.env');
+}
 
-$application = new \Symfony\Bundle\FrameworkBundle\Console\Application($kernel);
-$application->setAutoExit(false);
-$application->add(new \Doctrine\Bundle\DoctrineBundle\Command\DropDatabaseDoctrineCommand());
-$application->add(new \Doctrine\Bundle\DoctrineBundle\Command\CreateDatabaseDoctrineCommand());
-$application->add(new \Doctrine\Bundle\DoctrineBundle\Command\Proxy\RunSqlDoctrineCommand());
+passthru('bin/console hautelook:fixtures:load --env=test --no-interaction');
 
-$application->run(new \Symfony\Component\Console\Input\ArrayInput([
-    'command' => 'doctrine:database:drop',
-    '--if-exists' => '1',
-    '--force' => '1',
-]));
-
-$application->run(new \Symfony\Component\Console\Input\ArrayInput([
-    'command' => 'doctrine:database:create',
-]));
-
-$application->run(new \Symfony\Component\Console\Input\ArrayInput([
-    'command' => 'doctrine:query:sql',
-    'sql' => 'CREATE TABLE test (test VARCHAR(10))',
-]));
-
-$application->run(new \Symfony\Component\Console\Input\ArrayInput([
-    'command' => 'doctrine:migrations:migrate',
-    '--no-interaction' => '1',
-]));
-
-$kernel->shutdown();
+$_SERVER['APP_ENV'] = $_ENV['APP_ENV'] = ($_SERVER['APP_ENV'] ?? $_ENV['APP_ENV'] ?? null) ?: 'dev';
+$_SERVER['APP_DEBUG'] = $_SERVER['APP_DEBUG'] ?? $_ENV['APP_DEBUG'] ?? 'prod' !== $_SERVER['APP_ENV'];
+$_SERVER['APP_DEBUG'] = $_ENV['APP_DEBUG'] = (int) $_SERVER['APP_DEBUG'] || filter_var($_SERVER['APP_DEBUG'], FILTER_VALIDATE_BOOLEAN) ? '1' : '0';
