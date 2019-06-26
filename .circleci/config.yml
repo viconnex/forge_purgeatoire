@@ -1,0 +1,109 @@
+version: 2.1
+
+executors:
+  defaults_api-platform:
+    docker:
+      - image: chialab/php:7.2
+        environment:
+          - DATABASE_URL=postgres://seed:Ge0rgesMoustaki@localhost/seed
+      - image: circleci/postgres:9.6-alpine-ram
+        environment:
+          - POSTGRES_DB=seed
+          - POSTGRES_USER=seed
+          - POSTGRES_PASSWORD=Ge0rgesMoustaki
+
+jobs:
+  composer-install:
+    executor: defaults_api-platform
+    working_directory: ~/forge_purgeatoire
+    steps:
+      - checkout
+      - attach_workspace:
+          at: ~/forge_purgeatoire/backend
+      - restore_cache:
+          key: composer-cache-{{ checksum "backend/composer.lock" }}
+      - run:
+          working_directory: backend
+          name: Install composer dependencies
+          command: composer install -n --prefer-dist
+      - save_cache:
+          key: composer-cache-{{ checksum "backend/composer.lock" }}
+          paths:
+            - backend/vendor
+      - persist_to_workspace:
+          root: ~/forge_purgeatoire/backend
+          paths:
+            - vendor
+            - .env
+
+  api-platform-static-tests:
+    executor: defaults_api-platform
+    working_directory: ~/forge_purgeatoire
+    steps:
+      - checkout
+      - attach_workspace:
+          at: ~/forge_purgeatoire/backend
+      - restore_cache:
+          key: composer-cache-{{ checksum "backend/composer.lock" }}
+      - run:
+          working_directory: backend
+          name: Run static analysis
+          command: ./vendor/bin/phpstan analyse src
+
+  api-platform-functional-tests:
+    executor: defaults_api-platform
+    working_directory: ~/forge_purgeatoire
+    steps:
+      - checkout
+      - attach_workspace:
+          at: ~/forge_purgeatoire/backend
+      - restore_cache:
+          key: composer-cache-{{ checksum "backend/composer.lock" }}
+      - restore_cache:
+          key: phpunit-cache-{{ checksum "backend/composer.lock" }}
+      - run:
+          working_directory: backend
+          name: Run migrations
+          command: bin/console do:mi:mi --no-interaction --env=test
+      - run:
+          working_directory: backend
+          name: Run functional tests
+          command: bin/phpunit --configuration phpunit.xml.dist --testsuite Functional tests
+      - save_cache:
+          key: phpunit-cache-{{ checksum "backend/composer.lock" }}
+          paths:
+            - backend/bin/.phpunit
+      - persist_to_workspace:
+          root: ~/forge_purgeatoire/backend
+          paths:
+            - bin/.phpunit
+
+  api-platform-linter:
+    executor: defaults_api-platform
+    working_directory: ~/forge_purgeatoire
+    steps:
+      - checkout
+      - attach_workspace:
+          at: ~/forge_purgeatoire/backend
+      - restore_cache:
+          key: composer-cache-{{ checksum "backend/composer.lock" }}
+      - run:
+          working_directory: backend
+          name: Run static analysis
+          command: ./vendor/bin/php-cs-fixer fix --config=./.php_cs.dist --dry-run -v
+
+
+workflows:
+  version: 2
+  stack:
+    jobs:
+      - composer-install
+      - api-platform-linter:
+          requires:
+            - composer-install
+      - api-platform-static-tests:
+          requires:
+            - composer-install
+      - api-platform-functional-tests:
+          requires:
+            - composer-install
