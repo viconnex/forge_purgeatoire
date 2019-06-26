@@ -1,6 +1,7 @@
 <?php
 
 use Symfony\Component\Dotenv\Dotenv;
+use Symfony\Bundle\FrameworkBundle\Console\Application;
 
 require dirname(__DIR__).'/vendor/autoload.php';
 
@@ -17,6 +18,8 @@ if (is_array($env = @include dirname(__DIR__).'/.env.local.php')) {
 }
 
 var_dump('boooooootstrap');
+
+// passthru('php bin/console hautelook:fixtures:load --env=test --no-interaction');
 
 $_SERVER['APP_ENV'] = $_ENV['APP_ENV'] = ($_SERVER['APP_ENV'] ?? $_ENV['APP_ENV'] ?? null) ?: 'dev';
 $_SERVER['APP_DEBUG'] = $_SERVER['APP_DEBUG'] ?? $_ENV['APP_DEBUG'] ?? 'prod' !== $_SERVER['APP_ENV'];
